@@ -16,6 +16,7 @@ module.exports = function (opts) {
 
 module.exports.errorLogger = function (opts) {
     var logger, opts = opts || {}, format,
+        reqHeaders,
         immediate = false,
         parseUA = true,
         excludes,
@@ -24,9 +25,8 @@ module.exports.errorLogger = function (opts) {
         genReqId = defaultGenReqId,
         levelFn = defaultLevelFn,
         includesFn;
-
     if (opts.logger) {
-      logger = opts.logger;
+        logger = opts.logger;
     }
 
     // default format
@@ -39,6 +39,11 @@ module.exports.errorLogger = function (opts) {
     if (opts.immediate) {
         immediate = opts.immediate;
         delete opts.immediate;
+    }
+
+    if (opts.reqHeaders && opts.reqHeaders.length > 0) {
+        reqHeaders = opts.reqHeaders;
+        delete opts.reqHeaders;
     }
 
     if (opts.levelFn) {
@@ -87,7 +92,7 @@ module.exports.errorLogger = function (opts) {
         var requestId;
 
         if (genReqId)
-          requestId = genReqId(req);
+            requestId = genReqId(req);
 
         var childLogger = requestId !== undefined ? logger.child({req_id: requestId}) : logger;
         req.log = childLogger;
@@ -112,7 +117,6 @@ module.exports.errorLogger = function (opts) {
                 (req.socket && req.socket.remoteAddress) ||
                 (req.socket.socket && req.socket.socket.remoteAddress) ||
                 '127.0.0.1';
-
             var meta = {
                 'remote-address': ip,
                 'ip': ip,
@@ -126,13 +130,18 @@ module.exports.errorLogger = function (opts) {
                 'response-time': responseTime,
                 "response-hrtime": hrtime,
                 "status-code": status,
-                'req-headers': req.headers,
-                'res-headers': res._headers,
-                'req': req,
+                // 'res-headers': res._headers,
+                // 'req': req,
                 'res': res,
                 'incoming':incoming?'-->':'<--'
             };
-
+            var array = {};
+            if (reqHeaders && reqHeaders.length > 0) {
+                for (var i = 0; i < reqHeaders.length; i++) {
+                    array[reqHeaders[i]] = req.headers[reqHeaders[i]]
+                }
+            }
+            meta['req-headers'] = array;
             err && (meta.err = err);
 
             var level = levelFn(status, err, meta);
@@ -150,7 +159,7 @@ module.exports.errorLogger = function (opts) {
 
                     for (var p in meta)
                         if (!exs[p])
-                          json[p] = meta[p];
+                            json[p] = meta[p];
                 }
             }
 
@@ -166,17 +175,17 @@ module.exports.errorLogger = function (opts) {
 
             // obfuscate last in case we set something in our includesFn
             if (obfuscate) {
-              for(var i in obfuscate) {
-                var key = obfuscate[i];
-                if (has(json, key)) {
-                  set(json, key, obfuscatePlaceholder);
+                for(var i in obfuscate) {
+                    var key = obfuscate[i];
+                    if (has(json, key)) {
+                        set(json, key, obfuscatePlaceholder);
+                    }
                 }
-              }
             }
 
             // Set the short-body here in case we've modified the body in obfuscate
             if (json && json.body) {
-              json['short-body'] = util.inspect(json.body).substring(0, 20);
+                json['short-body'] = util.inspect(json.body).substring(0, 20);
             }
 
             if (!json) {
@@ -202,10 +211,10 @@ module.exports.errorLogger = function (opts) {
 function compile(fmt) {
     fmt = fmt.replace(/"/g, '\\"');
     var js = '  return "' + fmt.replace(/:([-\w]{2,})(?:\[([^\]]+)\])?/g, function (_, name, arg) {
-        if (arg)
-            return '"\n + (meta["' + name + '"] ? (meta["' + name + '"]["' + arg + '"]|| (typeof meta["' + name + '"]["' + arg + '"] === "number"?"0": "-")) : "-") + "';
-        return '"\n    + ((meta["' + name + '"]) || (typeof meta["'+name+'"] === "number"?"0": "-")) + "';
-    }) + '";';
+            if (arg)
+                return '"\n + (meta["' + name + '"] ? (meta["' + name + '"]["' + arg + '"]|| (typeof meta["' + name + '"]["' + arg + '"] === "number"?"0": "-")) : "-") + "';
+            return '"\n    + ((meta["' + name + '"]) || (typeof meta["'+name+'"] === "number"?"0": "-")) + "';
+        }) + '";';
     return new Function('meta', js);
 }
 
@@ -222,7 +231,7 @@ function defaultLevelFn(status, err) {
 
 
 function defaultGenReqId(req) {
-  var requestId = uuid.v4();
-  req.id = requestId;
-  return requestId;
+    var requestId = uuid.v4();
+    req.id = requestId;
+    return requestId;
 }
