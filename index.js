@@ -44,6 +44,12 @@ module.exports.errorLogger = function (opts) {
     if (opts.reqHeaders && opts.reqHeaders.length > 0) {
         reqHeaders = opts.reqHeaders;
         delete opts.reqHeaders;
+    } else {
+        reqHeaders = [
+            'host',
+            'user-agent'
+        ];
+        delete opts.reqHeaders;
     }
 
     if (opts.levelFn) {
@@ -113,12 +119,11 @@ module.exports.errorLogger = function (opts) {
                 responseTime = hrtime[0] * 1e3 + hrtime[1] / 1e6,
                 ip, logFn;
 
-            ip = ip || req.ip || req.connection.remoteAddress ||
+            ip = ip || req.headers['x-real-ip'] || req.connection.remoteAddress ||
                 (req.socket && req.socket.remoteAddress) ||
                 (req.socket.socket && req.socket.socket.remoteAddress) ||
                 '127.0.0.1';
             var meta = {
-                'remote-address': ip,
                 'ip': ip,
                 'method': method,
                 'url': url,
